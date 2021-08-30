@@ -21,9 +21,9 @@
   SOFTWARE.
 
 **/
+#include "Kernel.h"
 #include <stdlib.h>
 #include <stdint.h>
-#include "Kernel.h"
 
 /******************************************************************************
  * Function Prototypes                                                        *
@@ -70,7 +70,22 @@ SetSystemClock (
   void
   )
 {
+  *RunModeClockConfigurationRegister &= ~0x1;           // Main oscillator is enabled
+  *RunModeClockConfigurationRegister &= ~(0x3 << 4);    // MOSC
+  *RunModeClockConfigurationRegister |= (0x15 << 6);    // Crystal Value: 16 MHz
+  *RunModeClockConfigurationRegister &= ~(1 << 11);     // PLL Bypass: PLL output clock
+  *RunModeClockConfigurationRegister &= ~(1 << 13);     // PLL Normal Operation
+  *RunModeClockConfigurationRegister |= (1 << 22);      // Use SYSDIV
+  *RunModeClockConfigurationRegister |= (1 << 23);      // SYSDIV
 
+  *RunModeClockConfiguration2Register &= ~(0x7 << 4);   // MOSC
+  *RunModeClockConfiguration2Register &= ~(1 << 11);    // PLL Bypass: PLL output clock
+  *RunModeClockConfiguration2Register &= ~(1 << 13);    // PLL Normal Operation
+  *RunModeClockConfiguration2Register |= (1 << 30);     // Append SYSDIV2LSB to SYSDIV2 (DIV400)
+  *RunModeClockConfiguration2Register |= (1u << 31u);   // RCC2 is used
+  *RunModeClockConfiguration2Register &= ~(1 << 22);    // SYSDIV2LSB
+  *RunModeClockConfiguration2Register &= ~(0x3F << 23); // Clear SYSDIV2
+  //*RunModeClockConfiguration2Register |= (0x2 << 23);  // Set SYSDIV2
 }
 
 /**
