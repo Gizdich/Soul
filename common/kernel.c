@@ -1,6 +1,6 @@
 /**
 
-  Copyright (c) 2021 John G. Gizdich III
+  Copyright (c) 2022 John G. Gizdich III
 
   Permission is hereby granted, free of charge, to any person obtaining a copy
   of this software and associated documentation files (the "Software"), to deal
@@ -21,29 +21,25 @@
   SOFTWARE.
 
 **/
-#include "Kernel.h"
+#include <kernel.h>
+#include <interrupts.h>
+#include <clock.h>
+#include <stack.h>
 #include <stdlib.h>
 #include <stdint.h>
 
 /******************************************************************************
  * Function Prototypes                                                        *
  ******************************************************************************/
-
 static
 void
-SetSystemClock (
+pcbAndTcbInit (
   void
   );
 
 static
 void
-PcbAndTcbInit (
-  void
-  );
-
-static
-void
-StackInitForTcb (
+stackInitForTcb (
   uint8_t Pid,
   uint8_t Tid
   );
@@ -51,42 +47,11 @@ StackInitForTcb (
 /******************************************************************************
  * Global variables                                                           *
  ******************************************************************************/
-uint32_t volatile     *RunModeClockConfigurationRegister  = (uint32_t volatile *) 0x400FE060;
-uint32_t volatile     *RunModeClockConfiguration2Register = (uint32_t volatile *) 0x400FE070;
 PROCESS_CONTROL_BLOCK Pcbs[MAXIMUM_NUMBER_OF_PROCESSES]   = {0};
 
 /******************************************************************************
  * Code                                                                       *
  ******************************************************************************/
-
-/**
-
-  Set the system's clock to 80 MHz
-
-**/
-static
-void
-SetSystemClock (
-  void
-  )
-{
-  *RunModeClockConfigurationRegister &= ~0x1;           // Main oscillator is enabled
-  *RunModeClockConfigurationRegister &= ~(0x3 << 4);    // MOSC
-  *RunModeClockConfigurationRegister |= (0x15 << 6);    // Crystal Value: 16 MHz
-  *RunModeClockConfigurationRegister &= ~(1 << 11);     // PLL Bypass: PLL output clock
-  *RunModeClockConfigurationRegister &= ~(1 << 13);     // PLL Normal Operation
-  *RunModeClockConfigurationRegister |= (1 << 22);      // Use SYSDIV
-  *RunModeClockConfigurationRegister |= (1 << 23);      // SYSDIV
-
-  *RunModeClockConfiguration2Register &= ~(0x7 << 4);   // MOSC
-  *RunModeClockConfiguration2Register &= ~(1 << 11);    // PLL Bypass: PLL output clock
-  *RunModeClockConfiguration2Register &= ~(1 << 13);    // PLL Normal Operation
-  *RunModeClockConfiguration2Register |= (1 << 30);     // Append SYSDIV2LSB to SYSDIV2 (DIV400)
-  *RunModeClockConfiguration2Register |= (1u << 31u);   // RCC2 is used
-  *RunModeClockConfiguration2Register &= ~(1 << 22);    // SYSDIV2LSB
-  *RunModeClockConfiguration2Register &= ~(0x3F << 23); // Clear SYSDIV2
-  //*RunModeClockConfiguration2Register |= (0x2 << 23);  // Set SYSDIV2
-}
 
 /**
 
@@ -96,7 +61,7 @@ SetSystemClock (
 **/
 static
 void
-PcbAndTcbInit (
+pcbAndTcbInit (
   void
   )
 {
@@ -127,7 +92,7 @@ PcbAndTcbInit (
 **/
 static
 void
-StackInitForTcb (
+stackInitForTcb (
   IN  uint8_t Pid,
   IN  uint8_t Tid
   )
@@ -142,8 +107,7 @@ StackInitForTcb (
   // are used to save core registers' values
   Tcb->StackPointer = &(Tcb->StackMem[INITIAL_STACK_POINTER]);
 
-  // Program Status Register (PSR): Thumb bit is set
-  Tcb->StackMem[STACK_LOCATION_PSR] = 0x01000000;
+  Tcb->StackMem[STACK_LOCATION_PSR] = DEFAULT_STACK_PSR_VALUE;
 
   // Include a dummy value at the last stack entry to signify a flag for
   // stack overflow
@@ -156,13 +120,13 @@ StackInitForTcb (
 
 **/
 void
-OsInit (
+osInit (
   void
   )
 {
-  DisableInterrupts ();
-  SetSystemClock ();
-  PcbAndTcbInit ();
+  disableInterrupts ();
+  setSystemClock ();
+  pcbAndTcbInit ();
 }
 
 /**
@@ -178,7 +142,7 @@ OsInit (
 
 **/
 OS_STATUS
-OsAddForegroundThread (
+osAddForegroundThread (
   IN  void      (*Thread)(void),
   IN  uint32_t  StackSize,
   IN  uint32_t  Priority
@@ -189,13 +153,13 @@ OsAddForegroundThread (
   uint8_t               Pid;
   uint8_t               Tid;
 
-  DisableInterrupts ();
+  disableInterrupts ();
 
   Status  = OsOutOfResource;
   Pid     = 0;
 
   if (Pcbs[Pid].NumberOfThreads == MAXIMUM_NUMBER_OF_THREADS) {
-    EnableInterrupts ();
+    enableInterrupts ();
     return Status;
   }
 
@@ -204,7 +168,7 @@ OsAddForegroundThread (
       Tcb         = &(Pcbs[Pid].Tcbs[Tid]);
       Tcb->Status = Running;
 
-      StackInitForTcb (Pid, Tid);
+      stackInitForTcb (Pid, Tid);
 
       Tcb->StackMem[STACK_LOCATION_PC] = (uint32_t) (Thread);
 
@@ -220,7 +184,7 @@ OsAddForegroundThread (
     }
   }
 
-  EnableInterrupts ();
+  enableInterrupts ();
 
   return Status;
 }
