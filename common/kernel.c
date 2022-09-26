@@ -25,6 +25,7 @@
 #include <interrupts.h>
 #include <clock.h>
 #include <stack.h>
+#include <uart.h>
 #include <stdlib.h>
 #include <stdint.h>
 
@@ -126,6 +127,7 @@ osInit (
 {
   disableInterrupts ();
   setSystemClock ();
+  initializeUart();
   pcbAndTcbInit ();
 }
 

@@ -6,17 +6,20 @@ CFLAGS = -g3 -c -mcpu=$(MACHINE) -mthumb -std=c99 -Wall -O0 $(INCLUDE)
 BUILD_PATH = build
 OBJECT_PATH = $(BUILD_PATH)/objects
 LDFLAGS = -nostdlib -T targets/$(TARGET)/linkerScript.ld -Wl,-Map=$(BUILD_PATH)/soul.map
-OBJECT_FILES = $(OBJECT_PATH)/kernel.o $(OBJECT_PATH)/kernelAsm.o $(OBJECT_PATH)/clock.o $(OBJECT_PATH)/startup.o $(OBJECT_PATH)/main.o
+OBJECT_FILES = $(OBJECT_PATH)/kernelAsm.o $(OBJECT_PATH)/clock.o $(OBJECT_PATH)/uart.o $(OBJECT_PATH)/kernel.o $(OBJECT_PATH)/startup.o $(OBJECT_PATH)/main.o
 
 all: $(OBJECT_FILES) $(BUILD_PATH)/soul.elf
-
-$(OBJECT_PATH)/kernel.o: common/kernel.c | $(OBJECT_PATH)
-	$(CC) $(CFLAGS) $^ -o $@
 
 $(OBJECT_PATH)/kernelAsm.o: targets/$(TARGET)/kernelAsm.s | $(OBJECT_PATH)
 	$(CC) $(CFLAGS) $^ -o $@
 
 $(OBJECT_PATH)/clock.o: targets/$(TARGET)/clock.c | $(OBJECT_PATH)
+	$(CC) $(CFLAGS) $^ -o $@
+
+$(OBJECT_PATH)/uart.o: targets/$(TARGET)/uart.c | $(OBJECT_PATH)
+	$(CC) $(CFLAGS) $^ -o $@
+
+$(OBJECT_PATH)/kernel.o: common/kernel.c | $(OBJECT_PATH)
 	$(CC) $(CFLAGS) $^ -o $@
 
 $(OBJECT_PATH)/startup.o: targets/$(TARGET)/startup.c | $(OBJECT_PATH)
@@ -34,8 +37,11 @@ $(OBJECT_PATH):
 clean:
 	rm -rf $(BUILD_PATH)
 
-load:
+setup:
 	openocd -f board/ti_ek-tm4c123gxl.cfg -c "init"
 
-connect:
+gdb:
 	arm-none-eabi-gdb $(BUILD_PATH)/soul.elf
+
+connect:
+	screen /dev/tty.usbmodem0E2193CD1 115200
